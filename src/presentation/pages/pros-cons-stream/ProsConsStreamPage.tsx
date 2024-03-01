@@ -1,7 +1,7 @@
 
-import { ProsConsStreamUseCase } from "../../../core/use-cases";
+import { ProsConsStreamGeneratorUseCase, } from "../../../core/use-cases";
 import { GptMessage, MyMessage, TextMessageBox, TypingLoader } from "../../components"
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 
 interface Message {
@@ -12,53 +12,44 @@ interface Message {
 
 export const ProsConsStreamPage = () => {
 
-  const [isLoading, setisLoading] = useState(false)
+  const abortController = useRef (new AbortController());
 
-  const [messages, setMessages] = useState<Message[]>([])
+  const isRunning = useRef(false);
 
-  const handlePost = async(text: string) => {
+  const [isLoading, setisLoading] = useState(false);
+
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const handlePost = async (text: string) => {
+
+    if(isRunning.current) {
+      abortController.current.abort();
+      abortController.current = new AbortController();
+    }
     
     setisLoading(true); 
+    isRunning.current = true;
     
     setMessages( prev => [ ...prev, { text:text, isGPT: false } ] );
 
-    const reader = await ProsConsStreamUseCase(text);
+    const stream = ProsConsStreamGeneratorUseCase(text, abortController.current.signal);
 
     setisLoading(false);
 
-    if (!reader) return alert('No se pudo generar el reader');
+    setMessages( messages => [ ...messages, { text: '', isGPT: true } ] );
 
-    const decoder = new TextDecoder();
+    for await (const text of stream) {
+      setMessages(messages => {
+        const newMessages = [ ...messages];
+        newMessages [ newMessages.length -1 ].text = text;
+        return newMessages;
 
-    let message = '';
-
-    setMessages( messages => [ ...messages, { text:message, isGPT: true } ] );
-
-    while (true) {
-
-    const {  value, done} = await reader.read();
-
-    if (done) break;
-          
-
-    const decodedChunk = decoder.decode(value, {stream: true});
-
-    message  += decodedChunk
-
-    setMessages( messages => {
-
-      const newMessages = [ ...messages];
-      
-      newMessages [newMessages.length - 1].text = message;
-
-      return newMessages
-
-    });
-    
-    
-
-       }
+    })
   }
+
+  isRunning.current = false;
+
+ }
 
   return (
     <div className="chat-container">
