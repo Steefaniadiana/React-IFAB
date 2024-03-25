@@ -9,3 +9,5 @@ export * from './chat-input-boxes/TextMessageBoxFile'
 export * from './chat-input-boxes/TextMessageBoxSelect'
 
 export * from './bubbles/GptOrthographyMessage'
+export * from './bubbles/GptMessageAudio'
+export * from './bubbles/GptMessageImage'
